@@ -3,6 +3,7 @@
 #include <thread>
 #include <chrono>
 #include <mutex>
+#include <cstdlib> // For system function to open the default browser
 
 // Funkcja odpowiedzialna za aktywację trybu chronionego (x86)
 extern "C" void enable_protected_mode();
@@ -47,9 +48,24 @@ private:
     int executionTime;
 };
 
-// Funkcja, którą będzie wykonywać wątek
-void threadFunction(Process& process) {
-    process.execute();
+// Funkcja do uruchamiania domyślnej przeglądarki
+void openDefaultBrowser() {
+    std::cout << "Otwieranie domyślnej przeglądarki..." << std::endl;
+
+#ifdef _WIN32
+    system("start http://www.example.com");
+#elif defined __linux__
+    system("xdg-open http://www.example.com");
+#elif defined __APPLE__
+    system("open http://www.example.com");
+#else
+    std::cout << "Nieobsługiwany system operacyjny - nie można otworzyć przeglądarki." << std::endl;
+#endif
+}
+
+// Funkcja, którą będzie wykonywać wątek przeglądarki
+void browserThreadFunction() {
+    openDefaultBrowser();
 }
 
 // Funkcja symulująca obsługę przerwania
@@ -98,8 +114,7 @@ void schedulerBySystemCalls(std::vector<Process>& processes) {
 }
 
 // Główna funkcja jądra systemu
-extern "C" void kernel_main()
-{
+extern "C" void kernel_main() {
     // Przykładowa funkcjonalność jądra
     std::cout << "Witaj w jądrze systemu!" << std::endl;
 
@@ -123,6 +138,12 @@ extern "C" void kernel_main()
     // Wątek obsługujący przerwania systemowe
     std::thread systemCallThread(schedulerBySystemCalls, std::ref(processes));
 
+    // Wątek obsługujący przerwania sprzętowe
+    std::thread interruptThread(hardwareInterruptHandler);
+
+    // Wątek przeglądarki
+    std::thread browserThread(browserThreadFunction);
+
     // Oczekiwanie na zakończenie wątków
     for (auto& thread : threads) {
         thread.join();
@@ -134,22 +155,18 @@ extern "C" void kernel_main()
     // Czekamy na zakończenie wątku obsługującego przerwania systemowe
     systemCallThread.join();
 
+    // Czekamy na zakończenie wątku przeglądarki
+    browserThread.join();
+
     std::cout << "Wszystkie wątki zakończyły pracę." << std::endl;
 
-    // Wątek obsługujący przerwanie
-    std::thread interruptThread(hardwareInterruptHandler);
-
     // Pętla w celu uniknięcia przypadkowego zatrzymania programu
-    while (true)
-    {
+    while (true) {
         // Symulacja harmonogramowania procesów (zmiana aktywnego procesu co 3 sekundy)
         std::this_thread::sleep_for(std::chrono::seconds(3));
         std::lock_guard<std::mutex> lock(schedulerMutex);
         std::cout << "Zmiana aktywnego procesu - proces " << processes[activeProcessIndex].getExecutionTime() << " zakończył pracę." << std::endl;
     }
-
-    // Czekamy na zakończenie wątku obsługującego przerwanie
-    interruptThread.join();
 }
 
 // Funkcja odpowiedzialna za aktywację trybu chronionego (x86)
@@ -207,40 +224,6 @@ section .data
         ; np. kod do dalszej inicjalizacji i uruchomienia systemu operacyjnego
 
 
-    // Inicjalizacja GDT (Global Descriptor Table) zawierającej tylko jeden segment danych dla trybu chronionego
-    GDTEntry gdt_entry;
-    gdt_entry.limit_low = 0xFFFF;
-    gdt_entry.base_low = 0x0000;
-    gdt_entry.base_middle = 0x00;
-    gdt_entry.access = 0x9A;  // Segment jest dostępny w trybie supervisor, jest segmentem kodu i ma pełne uprawnienia
-    gdt_entry.granularity = 0xCF;  // Granularność 4 KB, 32-bitowy segment
-    gdt_entry.base_high = 0x00;
-
-    GDTDescriptor gdt_descriptor;
-    gdt_descriptor.size = sizeof(GDTEntry) - 1;
-    gdt_descriptor.offset = reinterpret_cast<uint32_t>(&gdt_entry);
-
-    asm volatile (
-        "cli\n\t"                         // Wyłącz przerwania
-        "lgdtl %0\n\t"                    // Załaduj deskryptor GDT do GDTR
-        "movl %%cr0, %%eax\n\t"           // Odczytaj rejestr CR0 do EAX
-        "orl $0x01, %%eax\n\t"            // Ustaw bit PE na 1 w rejestrze EAX
-        "movl %%eax, %%cr0\n\t"           // Zapisz EAX do rejestr CR0
-        "ljmpl $0x08, $protected_mode\n"  // Skok do nowego punktu wejścia trybu chronionego
-        "protected_mode:\n\t"
-        "movw $0x10, %%ax\n\t"            // Segment danych dla trybu chronionego
-        "movw %%ax, %%ds\n\t"             // Ustaw rejestr DS na nowy segment
-        "movw %%ax, %%es\n\t"             // Ustaw rejestr ES na nowy segment
-        "movw %%ax, %%fs\n\t"             // Ustaw rejestr FS na nowy segment
-        "movw %%ax, %%gs\n\t"             // Ustaw rejestr GS na nowy segment
-        "movw %%ax, %%ss\n\t"             // Ustaw rejestr SS na nowy segment
-        :
-        : "m" (gdt_descriptor)
-        : "eax"
-    );
-
-    std::cout << "Tryb chroniony aktywowany!" << std::endl;
-}
 
 // Obsługa przerwania sprzętowego (np. od timera lub innego urządzenia)
 void hardwareInterruptHandler() {
