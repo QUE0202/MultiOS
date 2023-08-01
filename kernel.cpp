@@ -113,6 +113,40 @@ void schedulerBySystemCalls(std::vector<Process>& processes) {
     }
 }
 
+// Funkcja do wyświetlenia menu i pobrania wyboru użytkownika
+int pokazMenu() {
+    int wybor;
+    std::cout << "\nMenu:\n";
+    std::cout << "1. Wykonaj procesy\n";
+    std::cout << "2. Otwórz domyślną przeglądarkę\n";
+    std::cout << "3. Wyjście\n";
+    std::cout << "4. Utwórz nowy proces\n";
+    std::cout << "5. Wyświetl listę procesów\n";
+    std::cout << "Wybierz opcję: ";
+    std::cin >> wybor;
+    return wybor;
+}
+
+// Funkcja do tworzenia i uruchamiania nowego procesu
+void createProcess(std::vector<Process>& processes) {
+    std::string name;
+    int executionTime;
+    std::cout << "Podaj nazwę nowego procesu: ";
+    std::cin >> name;
+    std::cout << "Podaj czas wykonania nowego procesu: ";
+    std::cin >> executionTime;
+    processes.emplace_back(processes.size() + 1, name, executionTime);
+    std::cout << "Utworzono nowy proces o nazwie '" << name << "' i czasie wykonania " << executionTime << " jednostek czasu." << std::endl;
+}
+
+// Funkcja do wyświetlenia listy procesów
+void showProcesses(const std::vector<Process>& processes) {
+    std::cout << "Lista procesów:" << std::endl;
+    for (const auto& process : processes) {
+        std::cout << "Proces " << process.getExecutionTime() << " (" << process.getExecutionTime() << " jednostek czasu)" << std::endl;
+    }
+}
+
 // Główna funkcja jądra systemu
 extern "C" void kernel_main() {
     // Przykładowa funkcjonalność jądra
@@ -129,7 +163,7 @@ extern "C" void kernel_main() {
     // Tworzenie wątków dla każdego procesu
     std::vector<std::thread> threads;
     for (auto& process : processes) {
-        threads.emplace_back(threadFunction, std::ref(process));
+        threads.emplace_back(&Process::execute, &process);
     }
 
     // Wątek harmonogramujący procesy
@@ -144,9 +178,41 @@ extern "C" void kernel_main() {
     // Wątek przeglądarki
     std::thread browserThread(browserThreadFunction);
 
-    // Oczekiwanie na zakończenie wątków
-    for (auto& thread : threads) {
-        thread.join();
+    // Zmienna do przechowywania wyboru użytkownika
+    int wyborUzytkownika;
+
+    while (true) {
+        // Wyświetlenie menu i pobranie wyboru użytkownika
+        wyborUzytkownika = pokazMenu();
+
+        switch (wyborUzytkownika) {
+            case 1:
+                // Wykonanie procesów
+                for (auto& thread : threads) {
+                    thread.join();
+                }
+                break;
+            case 2:
+                // Otworzenie domyślnej przeglądarki
+                browserThread.join();
+                break;
+            case 3:
+                // Wyjście z programu
+                std::cout << "Zamykanie programu..." << std::endl;
+                // Dodaj ewentualne procedury czyszczenia lub zamykania tutaj, jeśli są potrzebne
+                return;
+            case 4:
+                // Utworzenie nowego procesu
+                createProcess(processes);
+                break;
+            case 5:
+                // Wyświetlenie listy procesów
+                showProcesses(processes);
+                break;
+            default:
+                std::cout << "Nieprawidłowy wybór. Spróbuj ponownie." << std::endl;
+                break;
+        }
     }
 
     // Czekamy na zakończenie wątku harmonogramującego
@@ -222,8 +288,6 @@ section .data
     protected_mode_code:
         ; Tutaj umieść odpowiedni kod w trybie chronionym
         ; np. kod do dalszej inicjalizacji i uruchomienia systemu operacyjnego
-
-
 
 // Obsługa przerwania sprzętowego (np. od timera lub innego urządzenia)
 void hardwareInterruptHandler() {
