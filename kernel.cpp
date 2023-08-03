@@ -5,6 +5,9 @@
 #include <mutex>
 #include <cstdlib> // For system function to open the default browser
 
+// Deklaracje funkcji assemblera
+extern "C" void enable_protected_mode();
+
 // Funkcja odpowiedzialna za aktywację trybu chronionego (x86)
 extern "C" void enable_protected_mode();
 
@@ -235,6 +238,10 @@ extern "C" void kernel_main() {
     }
 }
 
+// Funkcja odpowiedzialna za aktywację trybu chronionego (x86)
+extern "C" void enable_protected_mode() {
+    // W tym miejscu należy umieścić odpowiednie instrukcje assemblerowe,
+    // które wykonają aktywację trybu chronionego x86.
 // Funkcja odpowiedzialna za aktywację trybu chronionego (x86)
 extern "C" void enable_protected_mode() {
     // W tym miejscu należy umieścić odpowiednie instrukcje assemblerowe,
