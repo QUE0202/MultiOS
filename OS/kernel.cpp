@@ -1296,6 +1296,61 @@ void Render() {
     // Przygotowanie danych dla tekstury 2D (np. kopiowanie z CPU do GPU)
     // ...
 
+    // Inicjalizacja DirectX 12
+
+    // Tworzenie obiektu urządzenia (device)
+    Microsoft::WRL::ComPtr<ID3D12Device> device;
+    D3D12CreateDevice(/*...*/, IID_PPV_ARGS(&device));
+
+    // Tworzenie bufora tekstury 3D
+    const UINT width = 128;
+    const UINT height = 128;
+    const UINT depth = 128;
+    const DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM; // Przykładowy format pikseli
+
+    D3D12_RESOURCE_DESC texDesc = {};
+    texDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+    texDesc.Alignment = 0;
+    texDesc.Width = width;
+    texDesc.Height = height;
+    texDesc.DepthOrArraySize = depth;
+    texDesc.MipLevels = 1;
+    texDesc.Format = format;
+    texDesc.SampleDesc.Count = 1;
+    texDesc.SampleDesc.Quality = 0;
+    texDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    texDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    Microsoft::WRL::ComPtr<ID3D12Resource> texture3D;
+    device->CreateCommittedResource(
+        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+        D3D12_HEAP_FLAG_NONE,
+        &texDesc,
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        nullptr,
+        IID_PPV_ARGS(&texture3D));
+
+    // Opcjonalnie, możesz załadować dane do tekstury
+
+    // Przygotowanie do renderowania
+
+    // Stworzenie widoku tekstury 3D
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Format = format;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
+    srvDesc.Texture3D.MipLevels = 1;
+    srvDesc.Texture3D.MostDetailedMip = 0;
+    srvDesc.Texture3D.ResourceMinLODClamp = 0.0f;
+
+    // Pamiętaj, aby alokować pamięć dla deskryptorów
+    UINT descriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    D3D12_CPU_DESCRIPTOR_HANDLE srvHandle; // Ustawianie tej zmiennej za pomocą odpowiedniego deskryptora
+
+    // Ustawienie deskryptora widoku tekstury 3D
+    device->CreateShaderResourceView(texture3D.Get(), &srvDesc, srvHandle);
+
+    // Renderowanie
+
     // Tworzenie dodatkowego bufora stałego
     Microsoft::WRL::ComPtr<ID3D12Resource> additionalConstantBuffer;
     UINT additionalConstantBufferSize = sizeof(AdditionalConstantBufferData); // Zakładamy, że mamy zdefiniowaną stałą bufora AdditionalConstantBufferData
